@@ -1,5 +1,6 @@
 from pydantic import BaseModel
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
+from typing import List 
 import sqlite3
 
 
@@ -14,6 +15,9 @@ class User(BaseModel):
     user_nik: str
     user_tanggal_lahir: str
     user_bpjs: str
+
+class UserPatch(BaseModel):
+    user_password: str | None = "kosong"
 
 #init db
 @router.get("/init/")
@@ -40,24 +44,27 @@ def init_db():
     return {"status": "Berhasil membuat tabel User"}
 
 
-@router.get('/getAllUsers')
-def get_user():
+@router.get('/getAllUsers', response_model=List[User])
+def get_all_users():
     conn = sqlite3.connect("carewave.db")
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM user")
-    user = cursor.fetchone()
+    users = cursor.fetchall()
     conn.close()
-    if user:
-        return {
-            "user_nama": user[1],
-            "user_email": user[2],
-            "user_no_telp": user[3],
-            "user_password": user[4],
-            "user_nik": user[5],
-            "user_tanggal_lahir": user[6],
-            "user_bpjs": user[7],
-        }
-    return None
+    if users:
+        return [
+            {
+                "user_nama": user[1],
+                "user_email": user[2],
+                "user_no_telp": user[3],
+                "user_password": user[4],
+                "user_nik": user[5],
+                "user_tanggal_lahir": user[6],
+                "user_bpjs": user[7],
+            }
+            for user in users
+        ]
+    raise HTTPException(status_code=404, detail="No users found")
 
 # User registration
 @router.post("/register")
@@ -101,3 +108,38 @@ def validator_login(email: str, password: str):
     else:
         return ["Tidak Ada"]
 
+@router.patch("/update_user/{user_id}",response_model=UserPatch)
+def update_user(response: Response, user_id: int, u: UserPatch):
+    try:
+        print(str(u))
+        DB_NAME = "carewave.db"
+        con = sqlite3.connect(DB_NAME)
+        cur = con.cursor()
+        cur.execute("select * from user where user_id = ?", (user_id,))  # tambah koma untuk menandakan tupple
+        existing_item = cur.fetchone()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Terjadi exception: {}".format(str(e)))
+    if existing_item:  # data ada, lakukan update
+        # asumsi minimal ada satu field update
+        # todo: bisa di-refactor dan dirapikan
+        sqlstr = "UPDATE user SET "
+        if u.user_password != "kosong":
+            if u.user_password is not None:
+                sqlstr += "user_password = '{}', ".format(u.user_password)
+            else:
+                sqlstr += "user_password = NULL, "        
+        sqlstr = sqlstr[:-2]  # Remove the trailing comma and space
+        
+        sqlstr += " WHERE user_id = {}".format(user_id)
+        print(sqlstr)
+        print("ssssss")
+        try:
+            cur.execute(sqlstr)
+            con.commit()
+            response.headers["location"] = "/user/{}".format(user_id)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail="Terjadi exception:  {}".format(str(e)))
+    else:  # data tidak ada 404, item not found
+        raise HTTPException(status_code=404, detail="Item Not Found")
+    con.close()
+    return u

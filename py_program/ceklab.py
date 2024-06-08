@@ -66,3 +66,27 @@ def insert_checklab(checklab: CheckLab):
 def add_checklab(checklab: CheckLab):
     insert_checklab(checklab)
     return {"message": "Laboratory check data added successfully"}
+
+@router.get("/getchecklab/", response_model=list[CheckLab])
+def getchecklab():
+    conn = connect_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT user_id, jenis_ceklab, foto, tanggal FROM ceklab")
+        records = cursor.fetchall()
+        if records:
+            return [
+                {
+                    "user_id": record[0],
+                    "jenis_ceklab": record[1],
+                    "foto": record[2],
+                    "tanggal": record[3],
+                }
+                for record in records
+            ]
+        else:
+            raise HTTPException(status_code=404, detail="No laboratory check data found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving check data from database: {e}")
+    finally:
+        conn.close()
