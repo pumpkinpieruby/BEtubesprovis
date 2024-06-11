@@ -1,43 +1,20 @@
-from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, status
+from pydantic import BaseModel
+from typing import List
 import sqlite3
 
 router = APIRouter()
 
-# Pydantic model for transaction data
 class Transaksi(BaseModel):
     id_pendaftaran: int
     metode_pembayaran: str
     status_pembayaran: str
 
-# Init db for transaksi
-@router.get("/init_transaksi/", status_code=status.HTTP_201_CREATED)
-def init_db_transaksi():
+@router.post("/addTransaksi", status_code=status.HTTP_201_CREATED)
+def add_transaksi(transaksi: Transaksi):
     try:
         conn = sqlite3.connect("carewave.db")
         cursor = conn.cursor()
-        cursor.execute(
-            """CREATE TABLE IF NOT EXISTS transaksi (
-                id_transaksi INTEGER PRIMARY KEY AUTOINCREMENT,
-                id_pendaftaran INTEGER NOT NULL,
-                metode_pembayaran TEXT NOT NULL,
-                status_pembayaran TEXT NOT NULL,
-                FOREIGN KEY (id_pendaftaran) REFERENCES pendaftaran (id_pendaftaran)
-            )"""
-        )
-        conn.commit()
-    except Exception as e:
-        return {"status": f"Error saat membuat tabel: {e}"}
-    finally:
-        conn.close()
-    return {"status": "Berhasil membuat tabel transaksi"}
-
-# Adding transaction
-@router.post("/addTransaksi", status_code=status.HTTP_201_CREATED)
-def add_transaksi(transaksi: Transaksi):
-    conn = sqlite3.connect("carewave.db")
-    cursor = conn.cursor()
-    try:
         cursor.execute(
             """INSERT INTO transaksi (id_pendaftaran, metode_pembayaran, status_pembayaran)
             VALUES (?, ?, ?)""",
@@ -50,8 +27,7 @@ def add_transaksi(transaksi: Transaksi):
         conn.close()
     return {"message": "Transaction added successfully"}
 
-# Getting all transactions for a registration
-@router.get("/getTransaksi/{id_pendaftaran}", status_code=status.HTTP_200_OK)
+@router.get("/getTransaksi/{id_pendaftaran}", response_model=List[Transaksi], status_code=status.HTTP_200_OK)
 def get_transaksi(id_pendaftaran: int):
     conn = sqlite3.connect("carewave.db")
     cursor = conn.cursor()
@@ -61,10 +37,9 @@ def get_transaksi(id_pendaftaran: int):
     if transactions:
         return [
             {
-                "id_transaksi": transaction[0],
                 "id_pendaftaran": transaction[1],
                 "metode_pembayaran": transaction[2],
-                "status_pembayaran": transaction[3],
+                "status_pembayaran": transaction[3]
             }
             for transaction in transactions
         ]

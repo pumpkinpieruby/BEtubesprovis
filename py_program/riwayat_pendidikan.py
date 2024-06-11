@@ -1,5 +1,6 @@
+from fastapi import APIRouter, HTTPException, Depends, status
 from pydantic import BaseModel
-from fastapi import APIRouter, HTTPException, status
+from typing import List
 import sqlite3
 
 router = APIRouter()
@@ -11,26 +12,26 @@ class RiwayatPendidikan(BaseModel):
     S2: str | None = None
     S3: str | None = None
 
-@router.get("/init/", status_code=status.HTTP_201_CREATED)
-def init_db():
-    try:
-        conn = sqlite3.connect("carewave.db")
-        cursor = conn.cursor()
-        cursor.execute("DROP TABLE IF EXISTS RiwayatPendidikan")  # Drop the existing table if it exists
-        cursor.execute(
-            """CREATE TABLE IF NOT EXISTS RiwayatPendidikan (
-                id_riwayat_pend_dokter INTEGER PRIMARY KEY AUTOINCREMENT,
-                S1 TEXT,
-                S2 TEXT,
-                S3 TEXT
-            )"""
-        )
-        conn.commit()
-    except Exception as e:
-        return {"status": f"Error saat membuat tabel: {e}"}
-    finally:
-        conn.close()
-    return {"status": "Berhasil membuat tabel Riwayat Pendidikan"}
+# @router.get("/init/", status_code=status.HTTP_201_CREATED)
+# def init_db():
+#     try:
+#         conn = sqlite3.connect("carewave.db")
+#         cursor = conn.cursor()
+#         cursor.execute("DROP TABLE IF EXISTS RiwayatPendidikan")  # Drop the existing table if it exists
+#         cursor.execute(
+#             """CREATE TABLE IF NOT EXISTS RiwayatPendidikan (
+#                 id_riwayat_pend_dokter INTEGER PRIMARY KEY AUTOINCREMENT,
+#                 S1 TEXT,
+#                 S2 TEXT,
+#                 S3 TEXT
+#             )"""
+#         )
+#         conn.commit()
+#     except Exception as e:
+#         return {"status": f"Error saat membuat tabel: {e}"}
+#     finally:
+#         conn.close()
+#     return {"status": "Berhasil membuat tabel Riwayat Pendidikan"}
 
 @router.post("/addRiwayatPendidikan", status_code=status.HTTP_201_CREATED)
 def add_riwayat_pendidikan(riwayat_pendidikan: RiwayatPendidikan):
@@ -67,3 +68,32 @@ def get_riwayat_pendidikan(id_riwayat_pend_dokter: int):
             for pendidikan in riwayat
         ]
     raise HTTPException(status_code=404, detail="No riwayat pendidikan found")
+
+@router.get("/getAllRiwayatPendidikan", response_model=List[RiwayatPendidikan], status_code=status.HTTP_200_OK)
+def get_all_riwayat_pendidikan():
+    conn = sqlite3.connect("carewave.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM RiwayatPendidikan")
+    riwayat = cursor.fetchall()
+    conn.close()
+    if riwayat:
+        return [
+            {
+                "id_riwayat_pend_dokter": rp[0],
+                "univ": rp[1],
+                "prodi": rp[2],
+                "tahun_lulus": rp[3]
+            }
+            for rp in riwayat
+        ]
+    raise HTTPException(status_code=404, detail="No riwayat pendidikan found")
+
+# # Menghapus dokter
+# @router.delete("/deleteRiwayatpendidikan/{id_riwayat_pend_dokter}", status_code=status.HTTP_200_OK)
+# def delete_doctor(id_riwayat_pend_dokter: int):
+#     conn = sqlite3.connect("carewave.db")
+#     cursor = conn.cursor()
+#     cursor.execute("DELETE FROM Doctor WHERE id_riwayat_pend_dokter = ?", (id_riwayat_pend_dokter,))
+#     conn.commit()
+#     conn.close()
+#     return {"message": "Doctor deleted successfully"}

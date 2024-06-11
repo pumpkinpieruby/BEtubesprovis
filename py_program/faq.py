@@ -1,5 +1,5 @@
+from fastapi import APIRouter, HTTPException, Path, status
 from pydantic import BaseModel
-from fastapi import APIRouter, HTTPException, status
 import sqlite3
 
 router = APIRouter()
@@ -10,28 +10,28 @@ class FAQ(BaseModel):
     judul_faq: str
     deskripsi_faq: str
 
-# Init db for FAQ
-@router.get("/init/", status_code=status.HTTP_201_CREATED)
-def init_db():
-    try:
-        conn = sqlite3.connect("carewave.db")
-        cursor = conn.cursor()
-        cursor.execute("DROP TABLE IF EXISTS Faq")  # Drop the existing table if it exists
-        cursor.execute(
-            """CREATE TABLE IF NOT EXISTS Faq(
-                id_faq INTEGER PRIMARY KEY AUTOINCREMENT,
-                judul_faq TEXT NOT NULL,
-                deskripsi_faq TEXT NOT NULL
-            )"""
-        )
-        conn.commit()
-    except Exception as e:
-        return {"status": f"Error saat membuat tabel: {e}"}
-    finally:
-        conn.close()
-    return {"status": "Berhasil membuat tabel FAQ"}
+# # Init db for FAQ
+# @router.get("/init/", status_code=status.HTTP_201_CREATED)
+# def init_db():
+#     try:
+#         conn = sqlite3.connect("carewave.db")
+#         cursor = conn.cursor()
+#         cursor.execute("DROP TABLE IF EXISTS Faq")  # Drop the existing table if it exists
+#         cursor.execute(
+#             """CREATE TABLE IF NOT EXISTS Faq(
+#                 id_faq INTEGER PRIMARY KEY AUTOINCREMENT,
+#                 judul_faq TEXT NOT NULL,
+#                 deskripsi_faq TEXT NOT NULL
+#             )"""
+#         )
+#         conn.commit()
+#     except Exception as e:
+#         return {"status": f"Error saat membuat tabel: {e}"}
+#     finally:
+#         conn.close()
+#     return {"status": "Berhasil membuat tabel FAQ"}
 
-@router.post("/addFAQ", status_code=status.HTTP_201_CREATED)
+@router.post("/", status_code=status.HTTP_201_CREATED)
 def add_faq(faq: FAQ):
     conn = sqlite3.connect("carewave.db")
     cursor = conn.cursor()
@@ -43,9 +43,7 @@ def add_faq(faq: FAQ):
         )
         conn.commit()
     except sqlite3.IntegrityError:
-        raise HTTPException(status_code=400, detail="Integrity error adding faq")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
+        raise HTTPException(status_code=400, detail="Error adding faq")
     finally:
         conn.close()
     return {"message": "FAQ added successfully"}
@@ -69,3 +67,32 @@ def get_faq(id_faq: int):
             "deskripsi_faq": faq[2],
         }
     raise HTTPException(status_code=404, detail="FAQ not found")
+
+# Memperbarui faq
+@router.put("/{id_faq}", response_model=FAQ, status_code=status.HTTP_200_OK)
+def update_faq(faq: FAQ, id_faq: int = Path(..., title="The ID of the faq to update", ge=1)):
+    conn = sqlite3.connect("carewave.db")
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """UPDATE FAQ
+            SET judul_faq = ?, deskripsi_faq = ?
+            WHERE id_faq = ?""",
+            (faq.id_faq, faq.judul_faq, faq.deskripsi_faq)
+        )
+        conn.commit()
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=400, detail="Error updating faq")
+    finally:
+        conn.close()
+    return faq
+
+# Menghapus faq
+@router.delete("/{id_faq}", status_code=status.HTTP_200_OK)
+def delete_faq(id_faq: int = Path(..., title="The ID of the faq to delete", ge=1)):
+    conn = sqlite3.connect("carewave.db")
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM FAQ WHERE id_faq = ?", (id_faq,))
+    conn.commit()
+    conn.close()
+    return {"message": "faq deleted successfully"}
